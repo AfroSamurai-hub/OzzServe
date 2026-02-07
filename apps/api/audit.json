@@ -1,0 +1,167 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "esbuild": {
+      "name": "esbuild",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1102341,
+          "name": "esbuild",
+          "dependency": "esbuild",
+          "title": "esbuild enables any website to send any requests to the development server and read the response",
+          "url": "https://github.com/advisories/GHSA-67mh-4wv8-2f99",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-346"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:N/A:N"
+          },
+          "range": "<=0.24.2"
+        }
+      ],
+      "effects": [
+        "vite"
+      ],
+      "range": "<=0.24.2",
+      "nodes": [
+        "node_modules/vite/node_modules/esbuild"
+      ],
+      "fixAvailable": {
+        "name": "vitest",
+        "version": "4.0.18",
+        "isSemVerMajor": true
+      }
+    },
+    "fastify": {
+      "name": "fastify",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        {
+          "source": 1112876,
+          "name": "fastify",
+          "dependency": "fastify",
+          "title": "Fastify Vulnerable to DoS via Unbounded Memory Allocation in sendWebStream",
+          "url": "https://github.com/advisories/GHSA-mrq3-vjjr-p77c",
+          "severity": "low",
+          "cwe": [
+            "CWE-770"
+          ],
+          "cvss": {
+            "score": 3.7,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:L"
+          },
+          "range": "<=5.7.2"
+        },
+        {
+          "source": 1112877,
+          "name": "fastify",
+          "dependency": "fastify",
+          "title": "Fastify's Content-Type header tab character allows body validation bypass",
+          "url": "https://github.com/advisories/GHSA-jx2c-rxcm-jvmq",
+          "severity": "high",
+          "cwe": [
+            "CWE-436"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N"
+          },
+          "range": "<5.7.2"
+        }
+      ],
+      "effects": [],
+      "range": "<=5.7.2",
+      "nodes": [
+        "node_modules/fastify"
+      ],
+      "fixAvailable": {
+        "name": "fastify",
+        "version": "5.7.4",
+        "isSemVerMajor": true
+      }
+    },
+    "vite": {
+      "name": "vite",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "esbuild"
+      ],
+      "effects": [
+        "vite-node",
+        "vitest"
+      ],
+      "range": "0.11.0 - 6.1.6",
+      "nodes": [
+        "node_modules/vite"
+      ],
+      "fixAvailable": {
+        "name": "vitest",
+        "version": "4.0.18",
+        "isSemVerMajor": true
+      }
+    },
+    "vite-node": {
+      "name": "vite-node",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "vite"
+      ],
+      "effects": [
+        "vitest"
+      ],
+      "range": "<=2.2.0-beta.2",
+      "nodes": [
+        "node_modules/vite-node"
+      ],
+      "fixAvailable": {
+        "name": "vitest",
+        "version": "4.0.18",
+        "isSemVerMajor": true
+      }
+    },
+    "vitest": {
+      "name": "vitest",
+      "severity": "moderate",
+      "isDirect": true,
+      "via": [
+        "vite",
+        "vite-node"
+      ],
+      "effects": [],
+      "range": "0.0.1 - 0.0.12 || 0.0.29 - 0.0.122 || 0.3.3 - 2.2.0-beta.2",
+      "nodes": [
+        "node_modules/vitest"
+      ],
+      "fixAvailable": {
+        "name": "vitest",
+        "version": "4.0.18",
+        "isSemVerMajor": true
+      }
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 4,
+      "high": 1,
+      "critical": 0,
+      "total": 5
+    },
+    "dependencies": {
+      "prod": 50,
+      "dev": 155,
+      "optional": 75,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 204
+    }
+  }
+}
