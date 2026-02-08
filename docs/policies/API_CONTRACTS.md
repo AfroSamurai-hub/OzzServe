@@ -26,15 +26,22 @@ Create a new booking.
 }
 ```
 
-### 2. `POST /bookings/:id/checkout`
-Initialize payment session.
+### 2. `POST /bookings/:id/pay`
+Initialize payment intention.
 **Response (200):**
 ```json
 {
-  "checkout_url": "url",
-  "session_id": "string"
+  "payment_intent_id": "uuid",
+  "status": "CREATED",
+  "amount": 10000,
+  "currency": "ZAR"
 }
 ```
+
+### 3. `POST /webhooks/:provider`
+Receive payment events with idempotency ledger.
+**Security**: Must verify provider signature.
+**Idempotency**: Checked via event ID in JSON body.
 
 ### 3. `GET /bookings/:id`
 Fetch booking status.
