@@ -9,9 +9,15 @@ CREATE TABLE IF NOT EXISTS bookings (
     service_id UUID NOT NULL,
     slot_id UUID NOT NULL,
     candidate_list JSONB DEFAULT '[]', -- List of provider UIDs
+    otp TEXT,
     expires_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS schema_versions (
+    version INTEGER PRIMARY KEY,
+    applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS booking_events (

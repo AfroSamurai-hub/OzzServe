@@ -1,19 +1,20 @@
 import pg from 'pg';
+import { config } from './config.js';
 
 let pool: pg.Pool | null = null;
 
 function getPool() {
     if (!pool) {
-        const isCloudSql = process.env.DB_HOST?.includes('/cloudsql/');
+        const isCloudSql = config.db.host.includes('/cloudsql/');
 
         pool = new pg.Pool({
-            user: process.env.DB_USER || 'user',
-            password: process.env.DB_PASS || 'password',
-            host: isCloudSql ? undefined : (process.env.DB_HOST || 'localhost'),
-            port: parseInt(process.env.DB_PORT || '5433'),
-            database: process.env.DB_NAME || 'ozzserve',
+            user: config.db.user,
+            password: config.db.pass,
+            host: isCloudSql ? undefined : config.db.host,
+            port: config.db.port,
+            database: config.db.name,
             // Cloud SQL use unix sockets if host starts with /
-            ...(isCloudSql ? { host: process.env.DB_HOST } : {})
+            ...(isCloudSql ? { host: config.db.host } : {})
         });
     }
     return pool;
@@ -51,5 +52,41 @@ export async function closePool() {
     if (pool) {
         await pool.end();
         pool = null;
+    }
+}
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Runs versioned migrations from db/migrations.
+ */
+export async function runMigrations() {
+    const migrationsDir = path.join(__dirname, '../db/migrations');
+    if (!fs.existsSync(migrationsDir)) return;
+
+    const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort();
+
+    // Ensure table exists
+    await query(`CREATE TABLE IF NOT EXISTS schema_versions (
+        version INTEGER PRIMARY KEY,
+        applied_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    for (const file of files) {
+        const version = parseInt(file.split('_')[0]);
+        if (isNaN(version)) continue;
+
+        const { rows } = await query('SELECT 1 FROM schema_versions WHERE version = $1', [version]);
+        if (rows.length === 0) {
+            console.log(`Applying migration ${file}...`);
+            const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
+            await withTx(async (client) => {
+                await client.query(sql);
+                await client.query('INSERT INTO schema_versions (version) VALUES ($1) ON CONFLICT (version) DO NOTHING', [version]);
+            });
+        }
     }
 }

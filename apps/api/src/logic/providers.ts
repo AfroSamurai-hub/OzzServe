@@ -61,7 +61,7 @@ export async function updateLocation(uid: string, lat: number, lng: number): Pro
 export async function getOffers(uid: string): Promise<Booking[]> {
     const res = await query<Booking>(
         `SELECT * FROM bookings 
-         WHERE status = 'PAID' 
+         WHERE status = 'PAID_SEARCHING' 
          AND candidate_list @> $1::jsonb`,
         [JSON.stringify([uid])]
     );

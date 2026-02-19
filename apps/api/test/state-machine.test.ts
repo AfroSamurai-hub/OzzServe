@@ -4,53 +4,56 @@ import { isValidTransition, isEligibleForPayout, isEligibleForRefund, BookingSta
 describe('Logic: State Machine Guards (Contract Aligned)', () => {
 
     test('Happy Path Lifecycle', () => {
-        // NULL -> PENDING (User)
-        expect(isValidTransition('NULL', 'PENDING', 'User')).toBe(true);
-        // PENDING -> AWAITING_PAYMENT (User)
-        expect(isValidTransition('PENDING', 'AWAITING_PAYMENT', 'User')).toBe(true);
-        // AWAITING_PAYMENT -> PAID (System)
-        expect(isValidTransition('AWAITING_PAYMENT', 'PAID', 'System')).toBe(true);
-        // PAID -> IN_PROGRESS (Provider)
-        expect(isValidTransition('PAID', 'IN_PROGRESS', 'Provider')).toBe(true);
-        // IN_PROGRESS -> CLOSED (Provider)
-        expect(isValidTransition('IN_PROGRESS', 'CLOSED', 'Provider')).toBe(true);
+        // NULL -> PENDING_PAYMENT (User)
+        expect(isValidTransition('NULL', 'PENDING_PAYMENT', 'User')).toBe(true);
+        // PENDING_PAYMENT -> PAID_SEARCHING (System)
+        expect(isValidTransition('PENDING_PAYMENT', 'PAID_SEARCHING', 'System')).toBe(true);
+        // PAID_SEARCHING -> ACCEPTED (Provider)
+        expect(isValidTransition('PAID_SEARCHING', 'ACCEPTED', 'Provider')).toBe(true);
+        // ACCEPTED -> EN_ROUTE (Provider)
+        expect(isValidTransition('ACCEPTED', 'EN_ROUTE', 'Provider')).toBe(true);
+        // EN_ROUTE -> ARRIVED (Provider)
+        expect(isValidTransition('EN_ROUTE', 'ARRIVED', 'Provider')).toBe(true);
+        // ARRIVED -> IN_PROGRESS (Provider)
+        expect(isValidTransition('ARRIVED', 'IN_PROGRESS', 'Provider')).toBe(true);
+        // IN_PROGRESS -> COMPLETE_PENDING (Provider)
+        expect(isValidTransition('IN_PROGRESS', 'COMPLETE_PENDING', 'Provider')).toBe(true);
+        // COMPLETE_PENDING -> CLOSED (System)
+        expect(isValidTransition('COMPLETE_PENDING', 'CLOSED', 'System')).toBe(true);
     });
 
-    describe('Illegal Transitions (5 Examples)', () => {
-        test('PENDING -> CLOSED (Skipping steps)', () => {
-            expect(isValidTransition('PENDING', 'CLOSED', 'User')).toBe(false);
+    describe('Illegal Transitions', () => {
+        test('PENDING_PAYMENT -> CLOSED (Skipping steps)', () => {
+            expect(isValidTransition('PENDING_PAYMENT', 'CLOSED', 'User')).toBe(false);
         });
-        test('PAID -> PENDING (Going backward)', () => {
-            expect(isValidTransition('PAID', 'PENDING', 'Admin')).toBe(false);
+        test('ACCEPTED -> PAID_SEARCHING (Going backward)', () => {
+            expect(isValidTransition('ACCEPTED', 'PAID_SEARCHING', 'Admin')).toBe(false);
         });
-        test('CLOSED -> PENDING (From terminal state)', () => {
-            expect(isValidTransition('CLOSED', 'PENDING', 'System')).toBe(false);
+        test('CLOSED -> ARRIVED (From terminal state)', () => {
+            expect(isValidTransition('CLOSED', 'ARRIVED', 'System')).toBe(false);
         });
-        test('CANCELLED -> PAID (From terminal state)', () => {
-            expect(isValidTransition('CANCELLED', 'PAID', 'System')).toBe(false);
-        });
-        test('NULL -> PAID (Skipping creation)', () => {
-            expect(isValidTransition('NULL', 'PAID', 'User')).toBe(false);
-        });
-    });
-
-    describe('Unauthorized Transitions (2 Examples)', () => {
-        test('PAID -> IN_PROGRESS (User instead of Provider)', () => {
-            expect(isValidTransition('PAID', 'IN_PROGRESS', 'User')).toBe(false);
-        });
-        test('AWAITING_PAYMENT -> PAID (Admin instead of System)', () => {
-            expect(isValidTransition('AWAITING_PAYMENT', 'PAID', 'Admin')).toBe(false);
+        test('CANCELLED -> EN_ROUTE (From terminal state)', () => {
+            expect(isValidTransition('CANCELLED', 'EN_ROUTE', 'System')).toBe(false);
         });
     });
 
-    describe('Payment Invariants (2 Examples)', () => {
+    describe('Unauthorized Transitions', () => {
+        test('PAID_SEARCHING -> ACCEPTED (User instead of Provider)', () => {
+            expect(isValidTransition('PAID_SEARCHING', 'ACCEPTED', 'User')).toBe(false);
+        });
+        test('COMPLETE_PENDING -> CLOSED (Admin instead of System)', () => {
+            expect(isValidTransition('COMPLETE_PENDING', 'CLOSED', 'Admin')).toBe(false);
+        });
+    });
+
+    describe('Payment Invariants', () => {
         test('Payout only after CLOSED', () => {
             expect(isEligibleForPayout('IN_PROGRESS')).toBe(false);
             expect(isEligibleForPayout('CLOSED')).toBe(true);
         });
-        test('Refund only in PAID state', () => {
-            expect(isEligibleForRefund('PENDING')).toBe(false);
-            expect(isEligibleForRefund('PAID')).toBe(true);
+        test('Refund in PAID_SEARCHING state', () => {
+            expect(isEligibleForRefund('PENDING_PAYMENT')).toBe(false);
+            expect(isEligibleForRefund('PAID_SEARCHING')).toBe(true);
             expect(isEligibleForRefund('CLOSED')).toBe(false);
         });
     });

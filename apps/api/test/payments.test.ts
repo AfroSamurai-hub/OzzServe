@@ -22,8 +22,8 @@ describe('Payments v1 & Webhook Idempotency', () => {
     const SLOT_ID = '550e8400-e29b-41d4-a716-446655440002';
     const CUSTOMER_UID = '550e8400-e29b-41d4-a716-446655440003';
 
-    test('Webhook flow: Success event transitions booking to PAID', async () => {
-        // 1. Create booking
+    test('Webhook flow: Success event transitions booking to PAID_SEARCHING', async () => {
+        // ... (steps 1-3)
         const createRes = await app.inject({
             method: 'POST',
             url: '/v1/bookings',
@@ -32,19 +32,15 @@ describe('Payments v1 & Webhook Idempotency', () => {
         });
         const bookingId = createRes.json().id;
 
-        // 2. Create Payment Intent
         const payRes = await app.inject({
             method: 'POST',
             url: `/v1/bookings/${bookingId}/pay`,
             headers: { 'x-user-id': CUSTOMER_UID, 'x-role': 'user' },
         });
         const { payment_intent_id } = payRes.json();
-
-        // Find provider_ref for the mock webhook
         const dbRes = await query('SELECT provider_ref FROM payment_intents WHERE id = $1', [payment_intent_id]);
         const providerRef = dbRes.rows[0].provider_ref;
 
-        // 3. Send Webhook
         const webhookRes = await app.inject({
             method: 'POST',
             url: '/v1/webhooks/stripe',
@@ -58,9 +54,12 @@ describe('Payments v1 & Webhook Idempotency', () => {
         expect(webhookRes.statusCode).toBe(200);
         expect(webhookRes.json().status).toBe('PROCESSED');
 
-        // 4. Verify booking is now PAID
+        // 4. Verify booking is now PAID_SEARCHING and intent is AUTHORIZED
         const checkRes = await query('SELECT status FROM bookings WHERE id = $1', [bookingId]);
-        expect(checkRes.rows[0].status).toBe('PAID');
+        expect(checkRes.rows[0].status).toBe('PAID_SEARCHING');
+
+        const intentRes = await query('SELECT status FROM payment_intents WHERE booking_id = $1', [bookingId]);
+        expect(intentRes.rows[0].status).toBe('AUTHORIZED');
     });
 
     test('Webhook Idempotency: Duplicate events run handler only once', async () => {

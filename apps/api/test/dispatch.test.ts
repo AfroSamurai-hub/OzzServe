@@ -91,6 +91,7 @@ describe('Provider Dispatch & Matching', () => {
             headers: { 'x-user-id': PROVIDER_UID, 'x-role': 'provider' },
         });
         expect(acceptRes.statusCode).toBe(200);
+        expect(acceptRes.json().status).toBe('ACCEPTED');
     });
 
     test('Provider who is not a candidate cannot accept', async () => {

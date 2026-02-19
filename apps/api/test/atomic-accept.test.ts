@@ -88,6 +88,7 @@ describe('Atomic Accept Verification', () => {
         });
 
         expect(res1.statusCode).toBe(200);
+        expect(res1.json().status).toBe('ACCEPTED');
         expect(res2.statusCode).toBe(400);
 
         // 3. Verify final state

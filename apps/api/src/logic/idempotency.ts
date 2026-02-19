@@ -14,6 +14,7 @@ export enum EventStatus {
 export async function processEvent(
     provider: string,
     eventId: string,
+    payload: any,
     handlerFn: () => Promise<void>
 ): Promise<'PROCESSED' | 'DUPLICATE'> {
     return withTx(async (client) => {
@@ -32,8 +33,8 @@ export async function processEvent(
             `INSERT INTO webhook_events (provider, event_id, status, payload_json, last_seen_at)
              VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
              ON CONFLICT (provider, event_id) DO UPDATE 
-             SET status = EXCLUDED.status, last_seen_at = EXCLUDED.last_seen_at`,
-            [provider, eventId, EventStatus.PENDING, null]
+             SET status = EXCLUDED.status, last_seen_at = EXCLUDED.last_seen_at, payload_json = EXCLUDED.payload_json`,
+            [provider, eventId, EventStatus.PENDING, JSON.stringify(payload)]
         );
 
         try {

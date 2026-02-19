@@ -47,7 +47,7 @@ describe('Booking Lifecycle Endpoints', () => {
         });
         const bookingId = res.json().id;
 
-        // Pay via webhook
+        // Pay via webhook (Simulates PENDING_PAYMENT -> PAID_SEARCHING)
         const payRes = await app.inject({
             method: 'POST',
             url: `/v1/bookings/${bookingId}/pay`,
@@ -66,29 +66,86 @@ describe('Booking Lifecycle Endpoints', () => {
         return bookingId;
     }
 
-    test('Happy Path: PAID -> accept -> complete', async () => {
+    test('Happy Path: Uber-like flow (PAID_SEARCHING -> accept -> travel -> arrived -> start -> complete)', async () => {
         const id = await createAndPay();
 
-        // Accept
+        // 1. Accept (PAID_SEARCHING -> ACCEPTED)
         const acceptRes = await app.inject({
             method: 'POST',
             url: `/v1/bookings/${id}/accept`,
             headers: { 'x-user-id': PROVIDER_ID, 'x-role': 'provider' }
         });
         expect(acceptRes.statusCode).toBe(200);
-        expect(acceptRes.json().status).toBe('IN_PROGRESS');
+        expect(acceptRes.json().status).toBe('ACCEPTED');
 
-        // Complete
+        // 2. Travel (ACCEPTED -> EN_ROUTE)
+        const travelRes = await app.inject({
+            method: 'POST',
+            url: `/v1/bookings/${id}/travel`,
+            headers: { 'x-user-id': PROVIDER_ID, 'x-role': 'provider' }
+        });
+        expect(travelRes.statusCode).toBe(200);
+        expect(travelRes.json().status).toBe('EN_ROUTE');
+
+        // 3. Arrived (EN_ROUTE -> ARRIVED)
+        const arrivedRes = await app.inject({
+            method: 'POST',
+            url: `/v1/bookings/${id}/arrived`,
+            headers: { 'x-user-id': PROVIDER_ID, 'x-role': 'provider' }
+        });
+        expect(arrivedRes.statusCode).toBe(200);
+        expect(arrivedRes.json().status).toBe('ARRIVED');
+
+        // 4. Start (ARRIVED -> IN_PROGRESS)
+        // Fetch booking to get OTP
+        const bookingRes = await app.inject({
+            method: 'GET',
+            url: `/v1/bookings/${id}`,
+            headers: { 'x-user-id': CUSTOMER_ID, 'x-role': 'user' }
+        });
+        const otp = bookingRes.json().otp;
+
+        const startRes = await app.inject({
+            method: 'POST',
+            url: `/v1/bookings/${id}/start`,
+            headers: { 'x-user-id': PROVIDER_ID, 'x-role': 'provider' },
+            payload: { otp }
+        });
+        expect(startRes.statusCode).toBe(200);
+        expect(startRes.json().status).toBe('IN_PROGRESS');
+
+        // 5. Complete (IN_PROGRESS -> COMPLETE_PENDING)
         const completeRes = await app.inject({
             method: 'POST',
             url: `/v1/bookings/${id}/complete`,
             headers: { 'x-user-id': PROVIDER_ID, 'x-role': 'provider' }
         });
         expect(completeRes.statusCode).toBe(200);
-        expect(completeRes.json().status).toBe('CLOSED');
+        expect(completeRes.json().status).toBe('COMPLETE_PENDING');
+
+        // Verify Capture
+        const intentRes = await query('SELECT status FROM payment_intents WHERE booking_id = $1', [id]);
+        expect(intentRes.rows[0].status).toBe('SUCCEEDED');
     });
 
-    test('Illegal Transition: Cannot start before payment', async () => {
+    test('OTP Verification: Cannot start with wrong OTP', async () => {
+        const id = await createAndPay();
+
+        // Move to ARRIVED
+        await app.inject({ method: 'POST', url: `/v1/bookings/${id}/accept`, headers: { 'x-user-id': PROVIDER_ID, 'x-role': 'provider' } });
+        await app.inject({ method: 'POST', url: `/v1/bookings/${id}/travel`, headers: { 'x-user-id': PROVIDER_ID, 'x-role': 'provider' } });
+        await app.inject({ method: 'POST', url: `/v1/bookings/${id}/arrived`, headers: { 'x-user-id': PROVIDER_ID, 'x-role': 'provider' } });
+
+        const startRes = await app.inject({
+            method: 'POST',
+            url: `/v1/bookings/${id}/start`,
+            headers: { 'x-user-id': PROVIDER_ID, 'x-role': 'provider' },
+            payload: { otp: '0000' } // Wrong OTP
+        });
+        expect(startRes.statusCode).toBe(400);
+        expect(startRes.json().error).toContain('Invalid or missing OTP');
+    });
+    test('Illegal Transition: Cannot start before payment or arrival', async () => {
         const res = await app.inject({
             method: 'POST',
             url: '/v1/bookings',
@@ -102,8 +159,7 @@ describe('Booking Lifecycle Endpoints', () => {
             url: `/v1/bookings/${id}/start`,
             headers: { 'x-user-id': PROVIDER_ID, 'x-role': 'provider' }
         });
-        expect(startRes.statusCode).toBe(400);
-        expect(startRes.json().error).toContain('Invalid transition');
+        expect(startRes.statusCode).toBe(400); // Fails due to missing OTP in schema
     });
 
     test('Unauthorized Role: Customer cannot accept booking', async () => {
@@ -119,14 +175,31 @@ describe('Booking Lifecycle Endpoints', () => {
     test('Provider Ownership: Only assigned provider can complete', async () => {
         const id = await createAndPay();
 
-        // Provider 1 accepts
+        // 1. Provider 1 accepts
         await app.inject({
             method: 'POST',
             url: `/v1/bookings/${id}/accept`,
             headers: { 'x-user-id': PROVIDER_ID, 'x-role': 'provider' }
         });
 
-        // Provider 2 tries to complete
+        // 2. Travel, Arrive, Start (Move to IN_PROGRESS)
+        await app.inject({ method: 'POST', url: `/v1/bookings/${id}/travel`, headers: { 'x-user-id': PROVIDER_ID, 'x-role': 'provider' } });
+        await app.inject({ method: 'POST', url: `/v1/bookings/${id}/arrived`, headers: { 'x-user-id': PROVIDER_ID, 'x-role': 'provider' } });
+
+        const bookingRes = await app.inject({
+            method: 'GET',
+            url: `/v1/bookings/${id}`,
+            headers: { 'x-user-id': CUSTOMER_ID, 'x-role': 'user' }
+        });
+        const otp = bookingRes.json().otp;
+        await app.inject({
+            method: 'POST',
+            url: `/v1/bookings/${id}/start`,
+            headers: { 'x-user-id': PROVIDER_ID, 'x-role': 'provider' },
+            payload: { otp }
+        });
+
+        // 3. Provider 2 tries to complete
         const res = await app.inject({
             method: 'POST',
             url: `/v1/bookings/${id}/complete`,

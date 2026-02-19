@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import admin from 'firebase-admin';
+import { config } from './config.js';
 
 // Initialize Firebase Admin (assuming credentials are in environment or default location)
 if (!admin.apps.length) {
@@ -24,7 +25,7 @@ declare module 'fastify' {
  */
 export async function verifyToken(request: FastifyRequest, reply: FastifyReply) {
     const authHeader = request.headers.authorization;
-    const isProd = process.env.NODE_ENV === 'production';
+    const isProd = config.isProd;
 
     // 1. Try Firebase JWT first (Standard for Prod and Dev)
     if (authHeader?.startsWith('Bearer ')) {

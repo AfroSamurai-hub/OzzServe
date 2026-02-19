@@ -29,7 +29,7 @@ describe('API Contract Enforcement: POST /v1/bookings', () => {
 
         // Exact field match as per API_CONTRACTS.md
         expect(body).toHaveProperty('id');
-        expect(body).toHaveProperty('status', 'PENDING');
+        expect(body).toHaveProperty('status', 'PENDING_PAYMENT');
         expect(body).toHaveProperty('expires_at');
         expect(typeof body.id).toBe('string');
         expect(typeof body.expires_at).toBe('string');

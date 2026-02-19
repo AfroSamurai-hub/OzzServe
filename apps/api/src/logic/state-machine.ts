@@ -3,7 +3,19 @@
  * Aligned strictly with docs/policies/STATE_MACHINE.md (LOCKED)
  */
 
-export type BookingState = 'PENDING' | 'AWAITING_PAYMENT' | 'PAID' | 'IN_PROGRESS' | 'CLOSED' | 'CANCELLED';
+export type BookingState =
+    | 'PENDING_PAYMENT'
+    | 'PAID_SEARCHING'
+    | 'ACCEPTED'
+    | 'EN_ROUTE'
+    | 'ARRIVED'
+    | 'IN_PROGRESS'
+    | 'COMPLETE_PENDING'
+    | 'CLOSED'
+    | 'CANCELLED'
+    | 'EXPIRED'
+    | 'NEEDS_REVIEW';
+
 export type UserRole = 'User' | 'System' | 'Provider' | 'Admin';
 
 interface Transition {
@@ -12,19 +24,43 @@ interface Transition {
 }
 
 const allowedTransitions: Record<string, Transition[]> = {
-    'NULL': [{ to: 'PENDING', who: 'User' }],
-    'PENDING': [{ to: 'AWAITING_PAYMENT', who: 'User' }],
-    'AWAITING_PAYMENT': [
-        { to: 'PAID', who: 'System' },
-        { to: 'CANCELLED', who: 'System' }
+    'NULL': [{ to: 'PENDING_PAYMENT', who: 'User' }],
+    'PENDING_PAYMENT': [
+        { to: 'PAID_SEARCHING', who: 'System' },
+        { to: 'CANCELLED', who: 'User' },
+        { to: 'EXPIRED', who: 'System' }
     ],
-    'PAID': [
-        { to: 'IN_PROGRESS', who: 'Provider' },
-        { to: 'CANCELLED', who: 'Admin' }
+    'PAID_SEARCHING': [
+        { to: 'ACCEPTED', who: 'Provider' },
+        { to: 'EXPIRED', who: 'System' },
+        { to: 'CANCELLED', who: 'User' }
     ],
-    'IN_PROGRESS': [{ to: 'CLOSED', who: 'Provider' }],
+    'ACCEPTED': [
+        { to: 'EN_ROUTE', who: 'Provider' },
+        { to: 'CANCELLED', who: 'User' },
+        { to: 'CANCELLED', who: 'Provider' },
+        { to: 'PAID_SEARCHING', who: 'Provider' } // Re-dispatch
+    ],
+    'EN_ROUTE': [
+        { to: 'ARRIVED', who: 'Provider' },
+        { to: 'CANCELLED', who: 'User' },
+        { to: 'CANCELLED', who: 'Provider' },
+        { to: 'PAID_SEARCHING', who: 'Provider' } // Re-dispatch
+    ],
+    'ARRIVED': [
+        { to: 'IN_PROGRESS', who: 'Provider' }, // Requires OTP (enforced in logic)
+        { to: 'CANCELLED', who: 'User' },
+        { to: 'CANCELLED', who: 'Provider' }
+    ],
+    'IN_PROGRESS': [{ to: 'COMPLETE_PENDING', who: 'Provider' }],
+    'COMPLETE_PENDING': [
+        { to: 'CLOSED', who: 'System' }, // Auto-close
+        { to: 'NEEDS_REVIEW', who: 'User' } // Issue reported
+    ],
     'CLOSED': [], // Terminal
     'CANCELLED': [], // Terminal
+    'EXPIRED': [], // Terminal
+    'NEEDS_REVIEW': [{ to: 'CLOSED', who: 'Admin' }, { to: 'CANCELLED', who: 'Admin' }],
 };
 
 /**
@@ -50,5 +86,5 @@ export function isEligibleForPayout(state: BookingState): boolean {
  * From PAYMENTS.md: "Refunds are only permitted for bookings in PAID state."
  */
 export function isEligibleForRefund(state: BookingState): boolean {
-    return state === 'PAID';
+    return state === 'PAID_SEARCHING';
 }
